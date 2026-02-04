@@ -39,7 +39,7 @@ export class Parser(
   // Error collection
   public var errors: ListBuilder<String> = new ListBuilder<String>();
 
-  constructor(tokenList: List<Token>) {
+  public constructor(tokenList: List<Token>) {
     tokens = tokenList;
     pos = 0;
   }

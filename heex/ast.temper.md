@@ -179,7 +179,7 @@ export class ComponentType {
 
   public var kind: String;
 
-  constructor(k: String) {
+  public constructor(k: String) {
     kind = k;
   }
 }
@@ -236,7 +236,7 @@ export class EExType {
 
   public var kind: String;
 
-  constructor(k: String) {
+  public constructor(k: String) {
     kind = k;
   }
 }

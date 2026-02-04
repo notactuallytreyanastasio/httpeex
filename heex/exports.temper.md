@@ -138,12 +138,12 @@ Example usage:
 
 ```temper
 // In consuming code:
-try {
+do {
   let doc = parseTemplate("<div>{@name}</div>");
   let html = renderToHtml(doc);
   console.log(html);
-} catch (e: Bubble) {
-  console.log("Parse errors: " + e.message);
+} orelse {
+  console.log("Parse error occurred");
 }
 ```
 

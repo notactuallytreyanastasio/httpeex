@@ -57,7 +57,7 @@ export class TokenType {
 
   public var kind: String;
 
-  constructor(k: String) {
+  public constructor(k: String) {
     kind = k;
   }
 
@@ -101,7 +101,7 @@ export class Tokenizer(
   public var tokens: ListBuilder<Token> = new ListBuilder<Token>();
 
   // Constructor with defaults
-  constructor(input: String) {
+  public constructor(input: String) {
     chars = input;
     pos = 0;
     line = 1;
