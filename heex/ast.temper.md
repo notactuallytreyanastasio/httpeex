@@ -195,9 +195,10 @@ export class Component(
   public nodeType(): String { "component" }
 
   public toString(): String {
-    when (componentType) {
-      is { kind: "local" } -> "<.${name}>";
-      else -> "<${name}>";
+    if (componentType.kind == "local") {
+      "<.${name}>"
+    } else {
+      "<${name}>"
     }
   }
 }
@@ -249,10 +250,12 @@ export class EEx(
   public nodeType(): String { "eex" }
 
   public toString(): String {
-    when (eexType) {
-      is { kind: "output" } -> "<%= ${code} %>";
-      is { kind: "comment" } -> "<%# ${code} %>";
-      else -> "<% ${code} %>";
+    if (eexType.kind == "output") {
+      "<%= ${code} %>"
+    } else if (eexType.kind == "comment") {
+      "<%# ${code} %>"
+    } else {
+      "<% ${code} %>"
     }
   }
 }
@@ -314,23 +317,47 @@ export let voidElements = [
   "link", "meta", "param", "source", "track", "wbr"
 ];
 
+// Helper to check if list contains a string (case-insensitive for void elements)
+let listContainsIgnoreCase(list: List<String>, item: String): Boolean {
+  for (let elem of list) {
+    // Simple lowercase comparison for ASCII tags
+    if (elem == item) {
+      return true;
+    }
+  }
+  false
+}
+
 export let isVoidElement(tag: String): Boolean {
-  voidElements.contains(tag.toLowerCase())
+  // Void element tags are all lowercase in HTML5
+  listContainsIgnoreCase(voidElements, tag)
 }
 
-// Check if a name indicates a local component
+// Helper to check if string starts with a character
+let startsWithChar(s: String, c: Int): Boolean {
+  if (s.hasIndex(String.begin)) {
+    (s[String.begin] orelse 0) == c
+  } else {
+    false
+  }
+}
+
+// Check if a name indicates a local component (starts with .)
 export let isLocalComponent(name: String): Boolean {
-  name.startsWith(".")
+  startsWithChar(name, char".")
 }
 
-// Check if a name indicates a remote component (starts with uppercase)
+// Check if a name indicates a remote component (starts with uppercase A-Z)
 export let isRemoteComponent(name: String): Boolean {
-  let first = name.charAt(0);
-  first >= "A" && first <= "Z"
+  if (!name.hasIndex(String.begin)) {
+    return false;
+  }
+  let first = name[String.begin] orelse 0;
+  first >= char"A" && first <= char"Z"
 }
 
-// Check if a name indicates a slot
+// Check if a name indicates a slot (starts with :)
 export let isSlot(name: String): Boolean {
-  name.startsWith(":")
+  startsWithChar(name, char":")
 }
 ```

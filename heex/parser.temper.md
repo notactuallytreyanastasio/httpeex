@@ -183,23 +183,31 @@ Dispatch to the appropriate parser based on token type.
 ```temper
 let parseNode(p: Parser): Node? {
   let t = p.peek();
+  let kind = t.tokenType.kind;
 
-  when (t) {
-    is { kind: "text" } -> parseText(p);
-    is { kind: "tag_open" } -> parseElement(p);
-    is { kind: "component_open" } -> parseComponent(p);
-    is { kind: "slot_open" } -> parseSlot(p);
-    is { kind: "expr_open" } -> parseExpression(p);
-    is { kind: "eex_open" } -> parseEEx(p, EExType.Exec);
-    is { kind: "eex_output" } -> parseEEx(p, EExType.Output);
-    is { kind: "eex_comment" } -> parseEEx(p, EExType.Comment);
-    is { kind: "comment_open" } -> parseComment(p);
-    else -> do {
-      // Skip unexpected token
-      p.error("Unexpected token: ${t.kind}");
-      p.advance();
-      null
-    };
+  if (kind == "text") {
+    parseText(p)
+  } else if (kind == "tag_open") {
+    parseElement(p)
+  } else if (kind == "component_open") {
+    parseComponent(p)
+  } else if (kind == "slot_open") {
+    parseSlot(p)
+  } else if (kind == "expr_open") {
+    parseExpression(p)
+  } else if (kind == "eex_open") {
+    parseEEx(p, EExType.Exec)
+  } else if (kind == "eex_output") {
+    parseEEx(p, EExType.Output)
+  } else if (kind == "eex_comment") {
+    parseEEx(p, EExType.Comment)
+  } else if (kind == "comment_open") {
+    parseComment(p)
+  } else {
+    // Skip unexpected token
+    p.error("Unexpected token: ${kind}");
+    p.advance();
+    null
   }
 }
 ```

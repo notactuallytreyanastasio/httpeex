@@ -191,22 +191,19 @@ let renderExpression(expr: Expression, out: StringBuilder): Void {
 
 ```temper
 let renderEEx(eex: EEx, out: StringBuilder): Void {
-  when (eex.eexType) {
-    is { kind: "output" } -> do {
-      out.append("<%= ");
-      out.append(eex.code);
-      out.append(" %>");
-    };
-    is { kind: "comment" } -> do {
-      out.append("<%# ");
-      out.append(eex.code);
-      out.append(" %>");
-    };
-    else -> do {
-      out.append("<% ");
-      out.append(eex.code);
-      out.append(" %>");
-    };
+  let kind = eex.eexType.kind;
+  if (kind == "output") {
+    out.append("<%= ");
+    out.append(eex.code);
+    out.append(" %>");
+  } else if (kind == "comment") {
+    out.append("<%# ");
+    out.append(eex.code);
+    out.append(" %>");
+  } else {
+    out.append("<% ");
+    out.append(eex.code);
+    out.append(" %>");
   }
 }
 
