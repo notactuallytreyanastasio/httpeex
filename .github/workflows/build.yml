@@ -32,7 +32,7 @@ jobs:
           git clone https://github.com/temperlang/temper.git /tmp/temper
           cd /tmp/temper
           ./gradlew cli:installDist
-          echo "/tmp/temper/cli/build/install/cli/bin" >> $GITHUB_PATH
+          echo "/tmp/temper/cli/build/install/temper/bin" >> $GITHUB_PATH
 
       - name: Build all backends
         run: |
