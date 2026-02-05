@@ -29,7 +29,7 @@ jobs:
 
       - name: Install Temper CLI
         run: |
-          git clone https://github.com/nicholasgalante1997/temper.git /tmp/temper
+          git clone https://github.com/temperlang/temper.git /tmp/temper
           cd /tmp/temper
           ./gradlew cli:installDist
           echo "/tmp/temper/cli/build/install/cli/bin" >> $GITHUB_PATH
