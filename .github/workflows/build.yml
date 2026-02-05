@@ -1,0 +1,82 @@
+name: Build All Backends
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            /tmp/temper/.gradle
+          key: ${{ runner.os }}-gradle-temper-${{ hashFiles('/tmp/temper/**/*.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-temper-
+
+      - name: Install Temper CLI
+        run: |
+          git clone https://github.com/nicholasgalante1997/temper.git /tmp/temper
+          cd /tmp/temper
+          ./gradlew cli:installDist
+          echo "/tmp/temper/cli/build/install/cli/bin" >> $GITHUB_PATH
+
+      - name: Build all backends
+        run: |
+          cd heex
+          temper build -b js -b py -b java -b csharp -b lua -b rust
+
+      - name: Upload JS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: heex-js
+          path: heex/temper.out/js/heex/
+          retention-days: 7
+
+      - name: Upload Python artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: heex-py
+          path: heex/temper.out/py/heex/
+          retention-days: 7
+
+      - name: Upload Java artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: heex-java
+          path: heex/temper.out/java/heex/
+          retention-days: 7
+
+      - name: Upload C# artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: heex-csharp
+          path: heex/temper.out/csharp/heex/
+          retention-days: 7
+
+      - name: Upload Lua artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: heex-lua
+          path: heex/temper.out/lua/heex/
+          retention-days: 7
+
+      - name: Upload Rust artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: heex-rs
+          path: heex/temper.out/rust/heex/
+          retention-days: 7

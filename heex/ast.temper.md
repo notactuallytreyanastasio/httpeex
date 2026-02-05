@@ -336,7 +336,7 @@ export let isVoidElement(tag: String): Boolean {
 // Helper to check if string starts with a character
 let startsWithChar(s: String, c: Int): Boolean {
   if (s.hasIndex(String.begin)) {
-    (s[String.begin] orelse 0) == c
+    s[String.begin] == c
   } else {
     false
   }
@@ -344,7 +344,7 @@ let startsWithChar(s: String, c: Int): Boolean {
 
 // Check if a name indicates a local component (starts with .)
 export let isLocalComponent(name: String): Boolean {
-  startsWithChar(name, char".")
+  startsWithChar(name, char'.')
 }
 
 // Check if a name indicates a remote component (starts with uppercase A-Z)
@@ -352,12 +352,12 @@ export let isRemoteComponent(name: String): Boolean {
   if (!name.hasIndex(String.begin)) {
     return false;
   }
-  let first = name[String.begin] orelse 0;
-  first >= char"A" && first <= char"Z"
+  let first = name[String.begin];
+  first >= char'A' && first <= char'Z'
 }
 
 // Check if a name indicates a slot (starts with :)
 export let isSlot(name: String): Boolean {
-  startsWithChar(name, char":")
+  startsWithChar(name, char':')
 }
 ```

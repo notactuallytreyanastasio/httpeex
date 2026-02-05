@@ -1,0 +1,115 @@
+name: Distribute to Sub-Repos
+
+on:
+  workflow_run:
+    workflows: ["Build All Backends"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  distribute:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: heex-js
+            artifact: heex-js
+          - name: heex-py
+            artifact: heex-py
+          - name: heex-java
+            artifact: heex-java
+          - name: heex-csharp
+            artifact: heex-csharp
+          - name: heex-lua
+            artifact: heex-lua
+          - name: heex-rs
+            artifact: heex-rs
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: notactuallytreyanastasio
+          repositories: ${{ matrix.name }}
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: generated-code
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to sub-repo
+        env:
+          TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ matrix.name }}
+        run: |
+          git clone https://x-access-token:${TOKEN}@github.com/notactuallytreyanastasio/${REPO}.git sub-repo
+
+          # Sync generated code to src/ (preserve .github, docs, examples, README, LICENSE)
+          mkdir -p sub-repo/src
+          rsync -av --delete \
+            --exclude='.git' \
+            generated-code/ sub-repo/src/
+
+          cd sub-repo
+          git config user.name "httpeex-distributor[bot]"
+          git config user.email "httpeex-distributor[bot]@users.noreply.github.com"
+
+          git add -A
+          if ! git diff --staged --quiet; then
+            git commit -m "Update from httpeex@${{ github.event.workflow_run.head_sha }}"
+            git push
+          else
+            echo "No changes to commit"
+          fi
+
+  tag-release:
+    needs: distribute
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: notactuallytreyanastasio
+          repositories: heex-js,heex-py,heex-java,heex-csharp,heex-lua,heex-rs
+
+      - name: Read version
+        id: version
+        run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
+
+      - name: Tag all sub-repos
+        env:
+          TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          for repo in heex-js heex-py heex-java heex-csharp heex-lua heex-rs; do
+            echo "Tagging ${repo}..."
+            git clone --depth 1 https://x-access-token:${TOKEN}@github.com/notactuallytreyanastasio/${repo}.git /tmp/${repo}
+            cd /tmp/${repo}
+            git config user.name "httpeex-distributor[bot]"
+            git config user.email "httpeex-distributor[bot]@users.noreply.github.com"
+
+            # Only tag if version doesn't exist
+            if ! git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+              git tag -a "v${VERSION}" -m "Release v${VERSION} from httpeex"
+              git push origin "v${VERSION}"
+              echo "Tagged ${repo} with v${VERSION}"
+            else
+              echo "Tag v${VERSION} already exists in ${repo}"
+            fi
+            cd -
+          done

@@ -1,0 +1,18 @@
+[
+  {
+    "hash": "ddcaace5e6613dd70e30caeadea11ff1ebdfd7d9",
+    "short_hash": "ddcaace",
+    "author": "=",
+    "date": "2026-02-04T19:12:50-05:00",
+    "message": "fix(heex): update code for Temper API compatibility\n\nPartial fixes for Temper compiler compatibility:\n\n- Replace `is { kind: \"...\" }` pattern matching with if/else chains\n  Temper's `when` doesn't support object destructuring patterns\n\n- Add helper functions using Temper's actual String API:\n  - startsWithChar() using String[StringIndex] and hasIndex()\n  - listContainsIgnoreCase() for void element checking\n  - isLocalComponent/isRemoteComponent/isSlot using char literals\n\n- Replace invalid String methods:\n  - charAt() -> str[String.begin] with orelse\n  - startsWith() -> custom startsWithChar()\n  - toLowerCase() -> direct comparison (void elements are lowercase)\n  - contains() -> custom list iteration\n\nINCOMPLETE: Tokenizer still needs complete rewrite to use\nStringIndex-based positioning instead of Int-based positions.\nTemper's String API is fundamentally different from Java/JS.\n\n⚠️ Does not compile yet - tokenizer rewrite pending\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>",
+    "files_changed": 3
+  },
+  {
+    "hash": "776e476e8f87ad732db60ef047514c5bde898a01",
+    "short_hash": "776e476",
+    "author": "=",
+    "date": "2026-02-04T19:10:07-05:00",
+    "message": "fix(heex): Temper syntax corrections for compilation\n\nFixes:\n- Change let to var for reassigned variables (eexType, depth, c, clauseCode, first, expression)\n- Change for(let i...) to for(var i...) for loop counters\n- Add public to constructors (ComponentType, EExType, TokenType, Tokenizer, Parser)\n- Replace try/catch with Temper's orelse pattern in error tests\n- Remove duplicate isRemoteComponent function from tokenizer\n- Import isRemoteComponent from ast module in tokenizer\n- Rename shouldBubble to tokenizerShouldBubble to avoid name collision\n- Fix example code in exports.temper.md to not be parsed as Temper code\n\nRemaining issues for full compilation:\n- String API differences: Temper uses different methods than JS/Java\n  - No toLowerCase(), startsWith(), charAt(), contains()\n  - Need to use Temper's String indexing (chars[pos]) instead\n- when pattern matching syntax may need adjustment\n\n⚠️ Partial - need to adapt to Temper's String API\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>",
+    "files_changed": 5
+  }
+]

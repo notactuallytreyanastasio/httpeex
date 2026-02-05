@@ -8,7 +8,8 @@ This is the first stage of the parsing pipeline.
 HEEx has several distinct token types representing different syntactic elements.
 
 ```temper
-let { Location, Span, isRemoteComponent } = import("./ast");
+// This file uses Location, Span, and isRemoteComponent from ast.temper.md
+// All files in this directory are automatically combined into the "heex" module.
 
 // All possible token types in HEEx
 export class TokenType {
@@ -83,6 +84,75 @@ export class Token(
 }
 ```
 
+## Character Constants
+
+Define character code points for efficient comparison.
+
+```temper
+class Chars {
+  public static let LT: Int = char'<';
+  public static let GT: Int = char'>';
+  public static let SLASH: Int = char'/';
+  public static let COLON: Int = char':';
+  public static let DOT: Int = char'.';
+  public static let LBRACE: Int = char'{';
+  public static let RBRACE: Int = char'}';
+  public static let PERCENT: Int = char'%';
+  public static let EQUALS: Int = char'=';
+  public static let HASH: Int = char'#';
+  public static let DQUOTE: Int = char'"';
+  public static let SQUOTE: Int = char'\'';
+  public static let BACKSLASH: Int = char'\\';
+  public static let DASH: Int = char'-';
+  public static let UNDERSCORE: Int = char'_';
+  public static let NEWLINE: Int = char'\n';
+  public static let TAB: Int = char'\t';
+  public static let CR: Int = char'\r';
+  public static let SPACE: Int = char' ';
+  public static let BANG: Int = char'!';
+  public static let LOWER_A: Int = char'a';
+  public static let LOWER_Z: Int = char'z';
+  public static let UPPER_A: Int = char'A';
+  public static let UPPER_Z: Int = char'Z';
+  public static let DIGIT_0: Int = char'0';
+  public static let DIGIT_9: Int = char'9';
+}
+```
+
+## Character Classification
+
+Helper functions for classifying character code points.
+
+```temper
+export let isWhitespace(c: Int): Boolean {
+  c == Chars.SPACE || c == Chars.TAB || c == Chars.NEWLINE || c == Chars.CR
+}
+
+export let isAlpha(c: Int): Boolean {
+  (c >= Chars.LOWER_A && c <= Chars.LOWER_Z) || (c >= Chars.UPPER_A && c <= Chars.UPPER_Z)
+}
+
+export let isUpper(c: Int): Boolean {
+  c >= Chars.UPPER_A && c <= Chars.UPPER_Z
+}
+
+export let isDigit(c: Int): Boolean {
+  c >= Chars.DIGIT_0 && c <= Chars.DIGIT_9
+}
+
+export let isAlphaNumeric(c: Int): Boolean {
+  isAlpha(c) || isDigit(c)
+}
+
+export let isNameChar(c: Int): Boolean {
+  isAlphaNumeric(c) || c == Chars.UNDERSCORE || c == Chars.DASH || c == Chars.DOT
+}
+
+export let isNameStart(c: Int): Boolean {
+  isAlpha(c) || c == Chars.UNDERSCORE
+}
+```
+
 ## Tokenizer State
 
 The tokenizer maintains state as it processes the input.
@@ -90,7 +160,7 @@ The tokenizer maintains state as it processes the input.
 ```temper
 export class Tokenizer(
   public chars: String,
-  public var pos: Int,
+  public var pos: StringIndex,
   public var line: Int,
   public var column: Int,
 ) {
@@ -103,48 +173,63 @@ export class Tokenizer(
   // Constructor with defaults
   public constructor(input: String) {
     chars = input;
-    pos = 0;
+    pos = String.begin;
     line = 1;
     column = 1;
   }
 
   // Check if we've consumed all input
   public isDone(): Boolean {
-    pos >= chars.length
+    !chars.hasIndex(pos)
   }
 
-  // Peek at current character without consuming
-  public peek(): String? {
+  // Peek at current character code point without consuming
+  public peek(): Int? {
     if (isDone()) {
       null
     } else {
-      chars.charAt(pos)
+      chars[pos]
     }
   }
 
   // Peek ahead by n characters
-  public peekAhead(n: Int): String? {
-    if (pos + n >= chars.length) {
-      null
+  public peekAhead(n: Int): Int? {
+    var idx = pos;
+    for (var i = 0; i < n; i += 1) {
+      if (!chars.hasIndex(idx)) {
+        return null;
+      }
+      idx = chars.next(idx);
+    }
+    if (chars.hasIndex(idx)) {
+      chars[idx]
     } else {
-      chars.charAt(pos + n)
+      null
     }
   }
 
   // Check if input matches a string at current position
   public matches(s: String): Boolean {
-    if (pos + s.length > chars.length) {
-      false
-    } else {
-      chars.substring(pos, pos + s.length) == s
+    var pi = pos;
+    var si = String.begin;
+    while (s.hasIndex(si)) {
+      if (!chars.hasIndex(pi)) {
+        return false;
+      }
+      if (chars[pi] != s[si]) {
+        return false;
+      }
+      pi = chars.next(pi);
+      si = s.next(si);
     }
+    true
   }
 
-  // Consume and return current character
-  public advance(): String {
-    let c = chars.charAt(pos);
-    pos = pos + 1;
-    if (c == "\n") {
+  // Consume and return current character code point
+  public advance(): Int {
+    let c = chars[pos];
+    pos = chars.next(pos);
+    if (c == Chars.NEWLINE) {
       line = line + 1;
       column = 1;
     } else {
@@ -153,18 +238,32 @@ export class Tokenizer(
     c
   }
 
-  // Consume n characters and return them
+  // Consume n characters and return them as a string
   public advanceBy(n: Int): String {
     let start = pos;
-    for (var i = 0; i < n; ++i) {
-      advance();
+    for (var i = 0; i < n; i += 1) {
+      if (chars.hasIndex(pos)) {
+        let c = chars[pos];
+        pos = chars.next(pos);
+        if (c == Chars.NEWLINE) {
+          line = line + 1;
+          column = 1;
+        } else {
+          column = column + 1;
+        }
+      }
     }
-    chars.substring(start, pos)
+    chars.slice(start, pos)
+  }
+
+  // Get a slice from start position to current position
+  public sliceFrom(start: StringIndex): String {
+    chars.slice(start, pos)
   }
 
   // Get current location
   public location(): Location {
-    new Location(line, column, pos)
+    new Location(line, column, 0)
   }
 
   // Record an error
@@ -180,36 +279,6 @@ export class Tokenizer(
 }
 ```
 
-## Character Classification
-
-Helper functions for classifying characters.
-
-```temper
-export let isWhitespace(c: String): Boolean {
-  c == " " || c == "\t" || c == "\n" || c == "\r"
-}
-
-export let isAlpha(c: String): Boolean {
-  (c >= "a" && c <= "z") || (c >= "A" && c <= "Z")
-}
-
-export let isDigit(c: String): Boolean {
-  c >= "0" && c <= "9"
-}
-
-export let isAlphaNumeric(c: String): Boolean {
-  isAlpha(c) || isDigit(c)
-}
-
-export let isNameChar(c: String): Boolean {
-  isAlphaNumeric(c) || c == "_" || c == "-" || c == "."
-}
-
-export let isNameStart(c: String): Boolean {
-  isAlpha(c) || c == "_"
-}
-```
-
 ## Main Tokenization Loop
 
 The primary entry point for tokenization.
@@ -219,11 +288,12 @@ export let tokenize(input: String): List<Token> throws Bubble {
   let t = new Tokenizer(input);
   tokenizeAll(t);
 
-  if (t.errors.length > 0) {
-    throw new Bubble(t.errors.build().join("\n"));
+  if (!t.errors.isEmpty) {
+    // Errors collected in tokenizer - bubble to signal failure
+    bubble()
   }
 
-  t.tokens.build()
+  t.tokens.toList()
 }
 
 let tokenizeAll(t: Tokenizer): Void {
@@ -254,13 +324,13 @@ let tokenizeNext(t: Tokenizer): Void {
   }
 
   // Check for tag start
-  if (c == "<") {
+  if (c == Chars.LT) {
     tokenizeTag(t);
     return;
   }
 
   // Check for expression start
-  if (c == "{") {
+  if (c == Chars.LBRACE) {
     tokenizeExpression(t);
     return;
   }
@@ -277,21 +347,21 @@ Consume text until we hit a special character.
 ```temper
 let tokenizeText(t: Tokenizer): Void {
   let start = t.location();
-  let text = new StringBuilder();
+  let startPos = t.pos;
 
   while (!t.isDone()) {
     let c = t.peek();
 
     // Stop at special characters
-    if (c == "<" || c == "{") {
+    if (c == Chars.LT || c == Chars.LBRACE) {
       break;
     }
 
-    text.append(t.advance());
+    t.advance();
   }
 
-  let value = text.build();
-  if (value.length > 0) {
+  let value = t.sliceFrom(startPos);
+  if (!value.isEmpty) {
     t.addToken(TokenType.Text, value, start);
   }
 }
@@ -309,21 +379,22 @@ let tokenizeTag(t: Tokenizer): Void {
   t.advance();
 
   // Check for closing tag
-  if (t.peek() == "/") {
+  let c = t.peek();
+  if (c == Chars.SLASH) {
     t.advance();
     tokenizeClosingTag(t, start);
     return;
   }
 
   // Check for slot (:name)
-  if (t.peek() == ":") {
+  if (c == Chars.COLON) {
     t.advance();
     tokenizeSlotOpen(t, start);
     return;
   }
 
   // Check for local component (.name)
-  if (t.peek() == ".") {
+  if (c == Chars.DOT) {
     t.advance();
     tokenizeComponentOpen(t, start, true);
     return;
@@ -332,7 +403,7 @@ let tokenizeTag(t: Tokenizer): Void {
   // Read tag/component name
   let name = readName(t);
 
-  if (name.length == 0) {
+  if (name.isEmpty) {
     t.error("Expected tag name after <");
     return;
   }
@@ -352,7 +423,7 @@ let tokenizeTag(t: Tokenizer): Void {
   if (t.matches("/>")) {
     t.advanceBy(2);
     t.addToken(TokenType.TagSelfClose, "/>", t.location());
-  } else if (t.peek() == ">") {
+  } else if (t.peek() == Chars.GT) {
     t.advance();
     t.addToken(TokenType.TagEnd, ">", t.location());
   } else {
@@ -362,11 +433,12 @@ let tokenizeTag(t: Tokenizer): Void {
 
 let tokenizeClosingTag(t: Tokenizer, start: Location): Void {
   // Check for slot close (</:name>)
-  if (t.peek() == ":") {
+  let c = t.peek();
+  if (c == Chars.COLON) {
     t.advance();
     let name = readName(t);
     skipWhitespace(t);
-    if (t.peek() == ">") {
+    if (t.peek() == Chars.GT) {
       t.advance();
     }
     t.addToken(TokenType.SlotClose, name, start);
@@ -374,21 +446,21 @@ let tokenizeClosingTag(t: Tokenizer, start: Location): Void {
   }
 
   // Check for local component close (</.name>)
-  if (t.peek() == ".") {
+  if (c == Chars.DOT) {
     t.advance();
     let name = readName(t);
     skipWhitespace(t);
-    if (t.peek() == ">") {
+    if (t.peek() == Chars.GT) {
       t.advance();
     }
-    t.addToken(TokenType.ComponentClose, "." + name, start);
+    t.addToken(TokenType.ComponentClose, ".${name}", start);
     return;
   }
 
   // Regular tag or remote component close
   let name = readName(t);
   skipWhitespace(t);
-  if (t.peek() == ">") {
+  if (t.peek() == Chars.GT) {
     t.advance();
   }
 
@@ -408,7 +480,7 @@ let tokenizeSlotOpen(t: Tokenizer, start: Location): Void {
   if (t.matches("/>")) {
     t.advanceBy(2);
     t.addToken(TokenType.TagSelfClose, "/>", t.location());
-  } else if (t.peek() == ">") {
+  } else if (t.peek() == Chars.GT) {
     t.advance();
     t.addToken(TokenType.TagEnd, ">", t.location());
   }
@@ -416,7 +488,7 @@ let tokenizeSlotOpen(t: Tokenizer, start: Location): Void {
 
 let tokenizeComponentOpen(t: Tokenizer, start: Location, isLocal: Boolean): Void {
   let name = readName(t);
-  let fullName = if (isLocal) { "." + name } else { name };
+  let fullName = if (isLocal) { ".${name}" } else { name };
   t.addToken(TokenType.ComponentOpen, fullName, start);
   tokenizeAttributes(t);
 
@@ -424,7 +496,7 @@ let tokenizeComponentOpen(t: Tokenizer, start: Location, isLocal: Boolean): Void
   if (t.matches("/>")) {
     t.advanceBy(2);
     t.addToken(TokenType.TagSelfClose, "/>", t.location());
-  } else if (t.peek() == ">") {
+  } else if (t.peek() == Chars.GT) {
     t.advance();
     t.addToken(TokenType.TagEnd, ">", t.location());
   }
@@ -443,18 +515,18 @@ let tokenizeAttributes(t: Tokenizer): Void {
     let c = t.peek();
 
     // End of attributes
-    if (c == ">" || c == "/" || c == null) {
+    if (c == Chars.GT || c == Chars.SLASH || c == null) {
       break;
     }
 
     // Check for spread attribute {@attrs}
-    if (c == "{") {
+    if (c == Chars.LBRACE) {
       tokenizeSpreadAttribute(t);
       continue;
     }
 
     // Check for special attribute (:if, :for, :key)
-    if (c == ":") {
+    if (c == Chars.COLON) {
       tokenizeSpecialAttribute(t);
       continue;
     }
@@ -463,7 +535,7 @@ let tokenizeAttributes(t: Tokenizer): Void {
     let start = t.location();
     let name = readName(t);
 
-    if (name.length == 0) {
+    if (name.isEmpty) {
       t.error("Expected attribute name");
       t.advance(); // Skip bad character
       continue;
@@ -474,7 +546,7 @@ let tokenizeAttributes(t: Tokenizer): Void {
     skipWhitespace(t);
 
     // Check for =
-    if (t.peek() == "=") {
+    if (t.peek() == Chars.EQUALS) {
       t.advance();
       t.addToken(TokenType.AttrEquals, "=", t.location());
 
@@ -491,19 +563,21 @@ let tokenizeAttributeValue(t: Tokenizer): Void {
   let c = t.peek();
 
   // Dynamic value {expression}
-  if (c == "{") {
+  if (c == Chars.LBRACE) {
     tokenizeExpression(t);
     return;
   }
 
   // Quoted string value
-  if (c == "\"" || c == "'") {
+  if (c == Chars.DQUOTE || c == Chars.SQUOTE) {
     let quote = t.advance();
-    let value = new StringBuilder();
+    let startPos = t.pos;
 
     while (!t.isDone() && t.peek() != quote) {
-      value.append(t.advance());
+      t.advance();
     }
+
+    let value = t.sliceFrom(startPos);
 
     if (t.peek() == quote) {
       t.advance();
@@ -511,22 +585,23 @@ let tokenizeAttributeValue(t: Tokenizer): Void {
       t.error("Unterminated string");
     }
 
-    t.addToken(TokenType.AttrValue, value.build(), start);
+    t.addToken(TokenType.AttrValue, value, start);
     return;
   }
 
   // Unquoted value (until whitespace or >)
-  let value = new StringBuilder();
+  let startPos = t.pos;
   while (!t.isDone()) {
     let ch = t.peek();
-    if (isWhitespace(ch) || ch == ">" || ch == "/") {
+    if (ch == null || isWhitespace(ch) || ch == Chars.GT || ch == Chars.SLASH) {
       break;
     }
-    value.append(t.advance());
+    t.advance();
   }
 
-  if (value.length > 0) {
-    t.addToken(TokenType.AttrValue, value.build(), start);
+  let value = t.sliceFrom(startPos);
+  if (!value.isEmpty) {
+    t.addToken(TokenType.AttrValue, value, start);
   }
 }
 
@@ -539,11 +614,11 @@ let tokenizeSpecialAttribute(t: Tokenizer): Void {
   t.advance(); // Skip :
 
   let name = readName(t);
-  t.addToken(TokenType.AttrName, ":" + name, start);
+  t.addToken(TokenType.AttrName, ":${name}", start);
 
   skipWhitespace(t);
 
-  if (t.peek() == "=") {
+  if (t.peek() == Chars.EQUALS) {
     t.advance();
     t.addToken(TokenType.AttrEquals, "=", t.location());
     skipWhitespace(t);
@@ -564,41 +639,45 @@ let tokenizeExpression(t: Tokenizer): Void {
   t.addToken(TokenType.ExprOpen, "{", start);
 
   // Read until matching }
-  let content = new StringBuilder();
+  let startPos = t.pos;
   var depth = 1;
 
   while (!t.isDone() && depth > 0) {
     let c = t.peek();
 
-    if (c == "{") {
+    if (c == Chars.LBRACE) {
       depth = depth + 1;
-      content.append(t.advance());
-    } else if (c == "}") {
+      t.advance();
+    } else if (c == Chars.RBRACE) {
       depth = depth - 1;
       if (depth > 0) {
-        content.append(t.advance());
+        t.advance();
       }
-    } else if (c == "\"" || c == "'") {
+    } else if (c == Chars.DQUOTE || c == Chars.SQUOTE) {
       // Skip string contents
       let quote = c;
-      content.append(t.advance());
+      t.advance();
       while (!t.isDone() && t.peek() != quote) {
-        if (t.peek() == "\\") {
-          content.append(t.advance());
+        if (t.peek() == Chars.BACKSLASH) {
+          t.advance();
         }
-        content.append(t.advance());
+        if (!t.isDone()) {
+          t.advance();
+        }
       }
       if (!t.isDone()) {
-        content.append(t.advance());
+        t.advance();
       }
     } else {
-      content.append(t.advance());
+      t.advance();
     }
   }
 
-  t.addToken(TokenType.ExprContent, content.build(), start);
+  // Get content (excluding the final })
+  let content = t.chars.slice(startPos, t.pos);
+  t.addToken(TokenType.ExprContent, content, start);
 
-  if (t.peek() == "}") {
+  if (t.peek() == Chars.RBRACE) {
     t.advance();
     t.addToken(TokenType.ExprClose, "}", t.location());
   } else {
@@ -619,10 +698,10 @@ let tokenizeEEx(t: Tokenizer): Void {
 
   // Determine EEx type
   var eexType = TokenType.EExOpen;
-  if (t.peek() == "=") {
+  if (t.peek() == Chars.EQUALS) {
     t.advance();
     eexType = TokenType.EExOutput;
-  } else if (t.peek() == "#") {
+  } else if (t.peek() == Chars.HASH) {
     t.advance();
     eexType = TokenType.EExComment;
   }
@@ -630,19 +709,55 @@ let tokenizeEEx(t: Tokenizer): Void {
   t.addToken(eexType, "", start);
 
   // Read content until %>
-  let content = new StringBuilder();
+  let startPos = t.pos;
 
   while (!t.isDone() && !t.matches("%>")) {
-    content.append(t.advance());
+    t.advance();
   }
 
-  t.addToken(TokenType.EExContent, content.build().trim(), start);
+  let content = t.sliceFrom(startPos);
+  // Trim whitespace manually
+  t.addToken(TokenType.EExContent, trimString(content), start);
 
   if (t.matches("%>")) {
     t.advanceBy(2);
     t.addToken(TokenType.EExClose, "%>", t.location());
   } else {
     t.error("Unterminated EEx expression");
+  }
+}
+
+// Manual trim implementation
+let trimString(s: String): String {
+  var startIdx = String.begin;
+  var endIdx = s.end;
+
+  // Find first non-whitespace
+  while (s.hasIndex(startIdx)) {
+    let c = s[startIdx];
+    if (!isWhitespace(c)) {
+      break;
+    }
+    startIdx = s.next(startIdx);
+  }
+
+  // Find last non-whitespace
+  while (s.hasIndex(s.prev(endIdx))) {
+    let prevIdx = s.prev(endIdx);
+    if (!s.hasIndex(prevIdx)) {
+      break;
+    }
+    let c = s[prevIdx];
+    if (!isWhitespace(c)) {
+      break;
+    }
+    endIdx = prevIdx;
+  }
+
+  if (!s.hasIndex(startIdx)) {
+    ""
+  } else {
+    s.slice(startIdx, endIdx)
   }
 }
 ```
@@ -658,13 +773,14 @@ let tokenizeComment(t: Tokenizer): Void {
   t.advanceBy(4); // Skip <!--
   t.addToken(TokenType.CommentOpen, "<!--", start);
 
-  let content = new StringBuilder();
+  let startPos = t.pos;
 
   while (!t.isDone() && !t.matches("-->")) {
-    content.append(t.advance());
+    t.advance();
   }
 
-  t.addToken(TokenType.CommentContent, content.build(), start);
+  let content = t.sliceFrom(startPos);
+  t.addToken(TokenType.CommentContent, content, start);
 
   if (t.matches("-->")) {
     t.advanceBy(3);
@@ -679,25 +795,35 @@ let tokenizeComment(t: Tokenizer): Void {
 
 ```temper
 let readName(t: Tokenizer): String {
-  let name = new StringBuilder();
+  let startPos = t.pos;
 
   // First character must be valid name start
-  var c = t.peek();
-  if (c != null && isNameStart(c)) {
-    name.append(t.advance());
+  let firstChar = t.peek();
+  when (firstChar) {
+    is Int -> do {
+      if (isNameStart(firstChar)) {
+        t.advance();
 
-    // Rest can be name chars
-    while (!t.isDone()) {
-      c = t.peek();
-      if (c != null && isNameChar(c)) {
-        name.append(t.advance());
-      } else {
-        break;
+        // Rest can be name chars
+        while (!t.isDone()) {
+          let nextChar = t.peek();
+          when (nextChar) {
+            is Int -> do {
+              if (isNameChar(nextChar)) {
+                t.advance();
+              } else {
+                break;
+              }
+            };
+            else -> break;
+          }
+        }
       }
-    }
+    };
+    else -> void;
   }
 
-  name.build()
+  t.sliceFrom(startPos)
 }
 
 let skipWhitespace(t: Tokenizer): Void {
@@ -710,7 +836,4 @@ let skipWhitespace(t: Tokenizer): Void {
     }
   }
 }
-
-// Re-export helper from ast
-// Use isRemoteComponent from ast module instead of duplicating here
 ```

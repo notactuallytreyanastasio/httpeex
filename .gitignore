@@ -1,2 +1,24 @@
-# Deciduous database (local)
-.deciduous/
+# Temper build outputs
+heex/temper.out/
+heex/temper.keep/
+
+# External repos (cloned for reference)
+temper/
+temper-regex-parser/
+phoenix_live_view/
+vscode-html-heex/
+prismora/
+
+# Environment files
+.env
+*.env
+.*.env
+
+# Editor
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# OS
+.DS_Store

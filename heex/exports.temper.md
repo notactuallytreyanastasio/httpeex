@@ -3,23 +3,11 @@
 This module defines the public API surface for the HEEx parser library.
 It re-exports the core functions and types that consumers should use.
 
-## Imports
+## Module Dependencies
 
-```temper
-let {
-  Node, Document, Text, Element, Component, ComponentType, Slot,
-  Expression, Attribute, StaticAttribute, DynamicAttribute,
-  SpreadAttribute, SpecialAttribute, EEx, EExType, EExBlock,
-  EExClause, Comment, Location, Span,
-  isVoidElement, isLocalComponent, isRemoteComponent, isSlot
-} = import("./ast");
-
-let { Token, TokenType, Tokenizer, tokenize } = import("./tokenizer");
-
-let { Parser, parse, parseTokens } = import("./parser");
-
-let { renderHtml, renderDebug, renderJson } = import("./renderer");
-```
+This file uses types and functions from ast.temper.md, tokenizer.temper.md,
+parser.temper.md, and renderer.temper.md.
+All files in this directory are automatically combined into the "heex" module.
 
 ## Core Parsing Functions
 
@@ -110,24 +98,11 @@ export let parseAndValidate(input: String): Boolean throws Bubble {
 
 ## Re-exported Types
 
-Export all AST types for consumers who need to work with the tree directly.
+Types are exported from their original modules (ast, tokenizer).
+Import them directly from those modules for advanced usage.
 
-```temper
-// Document and nodes
-export { Document, Node, Text, Element, Component, Slot, Expression, EEx, EExBlock, Comment };
-
-// Attribute types
-export { Attribute, StaticAttribute, DynamicAttribute, SpreadAttribute, SpecialAttribute };
-
-// Supporting types
-export { ComponentType, EExType, EExClause, Location, Span };
-
-// Token types (for advanced usage)
-export { Token, TokenType };
-
-// Utility functions
-export { isVoidElement, isLocalComponent, isRemoteComponent, isSlot };
-```
+Note: Direct re-export syntax is not supported. Use the wrapper functions
+(parseTemplate, tokenizeTemplate, renderToHtml, etc.) defined above.
 
 ## Error Handling
 

@@ -11,15 +11,24 @@ The renderer supports multiple output modes:
 2. **Debug String** - AST visualization for development
 3. **JSON** - Serialized AST for tooling integration
 
-## Imports
+## Module Dependencies
+
+This file uses types from ast.temper.md.
+All files in this directory are automatically combined into the "heex" module.
+
+## Character Constants for Escaping
 
 ```temper
-let {
-  Node, Document, Text, Element, Component, ComponentType, Slot,
-  Expression, Attribute, StaticAttribute, DynamicAttribute,
-  SpreadAttribute, SpecialAttribute, EEx, EExType, EExBlock,
-  EExClause, Comment, isVoidElement
-} = import("./ast");
+class RenderChars {
+  public static let AMP: Int = char'&';
+  public static let LT: Int = char'<';
+  public static let GT: Int = char'>';
+  public static let DQUOTE: Int = char'"';
+  public static let BACKSLASH: Int = char'\\';
+  public static let NEWLINE: Int = char'\n';
+  public static let CR: Int = char'\r';
+  public static let TAB: Int = char'\t';
+}
 ```
 
 ## HTML Rendering
@@ -32,7 +41,7 @@ export let renderHtml(doc: Document): String {
   for (let child of doc.children) {
     renderNode(child, out);
   }
-  out.build()
+  out.toString()
 }
 
 let renderNode(node: Node, out: StringBuilder): Void {
@@ -215,29 +224,29 @@ let renderEExBlock(block: EExBlock, out: StringBuilder): Void {
   out.append(" do %>");
 
   for (let clause of block.clauses) {
-    when (clause.clauseType) {
-      is "do" -> do {
-        for (let child of clause.children) {
-          renderNode(child, out);
-        }
-      };
-      is "else" -> do {
-        out.append("<% else %>");
-        for (let child of clause.children) {
-          renderNode(child, out);
-        }
-      };
-      is "end" -> do {
-        out.append("<% end %>");
-      };
-      else -> do {
-        out.append("<% ");
-        out.append(clause.expression orelse "");
-        out.append(" %>");
-        for (let child of clause.children) {
-          renderNode(child, out);
-        }
-      };
+    let ctype = clause.clauseType;
+    if (ctype == "do") {
+      for (let child of clause.children) {
+        renderNode(child, out);
+      }
+    } else if (ctype == "else") {
+      out.append("<% else %>");
+      for (let child of clause.children) {
+        renderNode(child, out);
+      }
+    } else if (ctype == "end") {
+      out.append("<% end %>");
+    } else {
+      out.append("<% ");
+      let expr = clause.expression;
+      when (expr) {
+        is String -> out.append(expr);
+        else -> void;
+      }
+      out.append(" %>");
+      for (let child of clause.children) {
+        renderNode(child, out);
+      }
     }
   }
 }
@@ -258,31 +267,42 @@ let renderComment(comment: Comment, out: StringBuilder): Void {
 ```temper
 let escapeHtml(s: String): String {
   let out = new StringBuilder();
-  for (var i = 0; i < s.length; ++i) {
-    let c = s.charAt(i);
-    when (c) {
-      is "&" -> out.append("&amp;");
-      is "<" -> out.append("&lt;");
-      is ">" -> out.append("&gt;");
-      else -> out.append(c);
+  var idx = String.begin;
+  while (s.hasIndex(idx)) {
+    let c = s[idx];
+    if (c == RenderChars.AMP) {
+      out.append("&amp;");
+    } else if (c == RenderChars.LT) {
+      out.append("&lt;");
+    } else if (c == RenderChars.GT) {
+      out.append("&gt;");
+    } else {
+      out.appendCodePoint(c) orelse void;
     }
+    idx = s.next(idx);
   }
-  out.build()
+  out.toString()
 }
 
 let escapeAttr(s: String): String {
   let out = new StringBuilder();
-  for (var i = 0; i < s.length; ++i) {
-    let c = s.charAt(i);
-    when (c) {
-      is "&" -> out.append("&amp;");
-      is "\"" -> out.append("&quot;");
-      is "<" -> out.append("&lt;");
-      is ">" -> out.append("&gt;");
-      else -> out.append(c);
+  var idx = String.begin;
+  while (s.hasIndex(idx)) {
+    let c = s[idx];
+    if (c == RenderChars.AMP) {
+      out.append("&amp;");
+    } else if (c == RenderChars.DQUOTE) {
+      out.append("&quot;");
+    } else if (c == RenderChars.LT) {
+      out.append("&lt;");
+    } else if (c == RenderChars.GT) {
+      out.append("&gt;");
+    } else {
+      out.appendCodePoint(c) orelse void;
     }
+    idx = s.next(idx);
   }
-  out.build()
+  out.toString()
 }
 ```
 
@@ -297,7 +317,7 @@ export let renderDebug(doc: Document): String {
   for (let child of doc.children) {
     renderDebugNode(child, out, "  ");
   }
-  out.build()
+  out.toString()
 }
 
 let renderDebugNode(node: Node, out: StringBuilder, indent: String): Void {
@@ -306,7 +326,7 @@ let renderDebugNode(node: Node, out: StringBuilder, indent: String): Void {
   when (node) {
     is Text -> do {
       out.append("Text: \"");
-      out.append(node.content.replace("\n", "\\n"));
+      out.append(escapeNewlines(node.content));
       out.append("\"\n");
     };
     is Element -> do {
@@ -314,10 +334,10 @@ let renderDebugNode(node: Node, out: StringBuilder, indent: String): Void {
       out.append(node.tag);
       out.append(">\n");
       for (let attr of node.attributes) {
-        renderDebugAttr(attr, out, indent + "  ");
+        renderDebugAttr(attr, out, "${indent}  ");
       }
       for (let child of node.children) {
-        renderDebugNode(child, out, indent + "  ");
+        renderDebugNode(child, out, "${indent}  ");
       }
     };
     is Component -> do {
@@ -325,13 +345,13 @@ let renderDebugNode(node: Node, out: StringBuilder, indent: String): Void {
       out.append(node.name);
       out.append("\n");
       for (let attr of node.attributes) {
-        renderDebugAttr(attr, out, indent + "  ");
+        renderDebugAttr(attr, out, "${indent}  ");
       }
       for (let child of node.children) {
-        renderDebugNode(child, out, indent + "  ");
+        renderDebugNode(child, out, "${indent}  ");
       }
       for (let slot of node.slots) {
-        renderDebugNode(slot, out, indent + "  ");
+        renderDebugNode(slot, out, "${indent}  ");
       }
     };
     is Slot -> do {
@@ -339,7 +359,7 @@ let renderDebugNode(node: Node, out: StringBuilder, indent: String): Void {
       out.append(node.name);
       out.append(">\n");
       for (let child of node.children) {
-        renderDebugNode(child, out, indent + "  ");
+        renderDebugNode(child, out, "${indent}  ");
       }
     };
     is Expression -> do {
@@ -361,11 +381,11 @@ let renderDebugNode(node: Node, out: StringBuilder, indent: String): Void {
       out.append(node.expression);
       out.append("\n");
       for (let clause of node.clauses) {
-        out.append(indent + "  Clause: ");
+        out.append("${indent}  Clause: ");
         out.append(clause.clauseType);
         out.append("\n");
         for (let child of clause.children) {
-          renderDebugNode(child, out, indent + "    ");
+          renderDebugNode(child, out, "${indent}    ");
         }
       }
     };
@@ -378,6 +398,26 @@ let renderDebugNode(node: Node, out: StringBuilder, indent: String): Void {
       out.append("Unknown node\n");
     };
   }
+}
+
+// Escape newlines for debug output
+let escapeNewlines(s: String): String {
+  let out = new StringBuilder();
+  var idx = String.begin;
+  while (s.hasIndex(idx)) {
+    let c = s[idx];
+    if (c == RenderChars.NEWLINE) {
+      out.append("\\n");
+    } else if (c == RenderChars.CR) {
+      out.append("\\r");
+    } else if (c == RenderChars.TAB) {
+      out.append("\\t");
+    } else {
+      out.appendCodePoint(c) orelse void;
+    }
+    idx = s.next(idx);
+  }
+  out.toString()
 }
 
 let renderDebugAttr(attr: Attribute, out: StringBuilder, indent: String): Void {
@@ -431,7 +471,7 @@ export let renderJson(doc: Document): String {
     renderJsonNode(child, out);
   }
   out.append("]}");
-  out.build()
+  out.toString()
 }
 
 let renderJsonNode(node: Node, out: StringBuilder): Void {
@@ -555,16 +595,23 @@ let renderJsonAttr(attr: Attribute, out: StringBuilder): Void {
 
 let jsonString(s: String, out: StringBuilder): Void {
   out.append("\"");
-  for (var i = 0; i < s.length; ++i) {
-    let c = s.charAt(i);
-    when (c) {
-      is "\"" -> out.append("\\\"");
-      is "\\" -> out.append("\\\\");
-      is "\n" -> out.append("\\n");
-      is "\r" -> out.append("\\r");
-      is "\t" -> out.append("\\t");
-      else -> out.append(c);
+  var idx = String.begin;
+  while (s.hasIndex(idx)) {
+    let c = s[idx];
+    if (c == RenderChars.DQUOTE) {
+      out.append("\\\"");
+    } else if (c == RenderChars.BACKSLASH) {
+      out.append("\\\\");
+    } else if (c == RenderChars.NEWLINE) {
+      out.append("\\n");
+    } else if (c == RenderChars.CR) {
+      out.append("\\r");
+    } else if (c == RenderChars.TAB) {
+      out.append("\\t");
+    } else {
+      out.appendCodePoint(c) orelse void;
     }
+    idx = s.next(idx);
   }
   out.append("\"");
 }

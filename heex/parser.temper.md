@@ -14,19 +14,147 @@ from the flat token stream. It handles:
 - EEx control flow blocks
 - Attribute processing
 
-## Imports
+## Module Dependencies
+
+This file uses types and functions defined in ast.temper.md and tokenizer.temper.md.
+All files in this directory are automatically combined into the "heex" module.
+
+## String Helper Functions
+
+Temper strings use StringIndex for iteration. These helpers provide common operations.
 
 ```temper
-let {
-  Node, Document, Text, Element, Component, ComponentType, Slot,
-  Expression, Attribute, StaticAttribute, DynamicAttribute,
-  SpreadAttribute, SpecialAttribute, EEx, EExType, EExBlock,
-  EExClause, Comment, Location, Span, isVoidElement
-} = import("./ast");
+// Check if string starts with a prefix
+let stringStartsWith(s: String, prefix: String): Boolean {
+  var si = String.begin;
+  var pi = String.begin;
+  while (prefix.hasIndex(pi)) {
+    if (!s.hasIndex(si)) {
+      return false;
+    }
+    if (s[si] != prefix[pi]) {
+      return false;
+    }
+    si = s.next(si);
+    pi = prefix.next(pi);
+  }
+  true
+}
 
-let {
-  Token, TokenType, tokenize
-} = import("./tokenizer");
+// Check if string ends with a suffix
+let stringEndsWith(s: String, suffix: String): Boolean {
+  // Find end positions and work backwards
+  var si = s.end;
+  var sui = suffix.end;
+
+  while (suffix.hasIndex(suffix.prev(sui))) {
+    sui = suffix.prev(sui);
+    if (!s.hasIndex(s.prev(si))) {
+      return false;
+    }
+    si = s.prev(si);
+    if (s[si] != suffix[sui]) {
+      return false;
+    }
+  }
+  true
+}
+
+// Check if string contains a substring
+let stringContains(s: String, sub: String): Boolean {
+  if (sub.isEmpty) {
+    return true;
+  }
+  var si = String.begin;
+  while (s.hasIndex(si)) {
+    // Try to match sub starting at si
+    var sj = si;
+    var subj = String.begin;
+    var matched = true;
+    while (sub.hasIndex(subj)) {
+      if (!s.hasIndex(sj) || s[sj] != sub[subj]) {
+        matched = false;
+        break;
+      }
+      sj = s.next(sj);
+      subj = sub.next(subj);
+    }
+    if (matched) {
+      return true;
+    }
+    si = s.next(si);
+  }
+  false
+}
+
+// Get substring from index to end
+let stringSliceFrom(s: String, startIdx: StringIndex): String {
+  s.slice(startIdx, s.end)
+}
+
+// Get substring removing last n characters
+let stringDropLast(s: String, n: Int): String {
+  var endIdx = s.end;
+  for (var i = 0; i < n; i += 1) {
+    if (s.hasIndex(s.prev(endIdx))) {
+      endIdx = s.prev(endIdx);
+    }
+  }
+  s.slice(String.begin, endIdx)
+}
+
+// Trim whitespace from both ends
+let stringTrim(s: String): String {
+  var startIdx = String.begin;
+  var endIdx = s.end;
+
+  // Find first non-whitespace
+  while (s.hasIndex(startIdx)) {
+    let c = s[startIdx];
+    if (!isWhitespace(c)) {
+      break;
+    }
+    startIdx = s.next(startIdx);
+  }
+
+  // Find last non-whitespace
+  while (s.hasIndex(s.prev(endIdx))) {
+    let prevIdx = s.prev(endIdx);
+    if (!s.hasIndex(prevIdx)) {
+      break;
+    }
+    let c = s[prevIdx];
+    if (!isWhitespace(c)) {
+      break;
+    }
+    endIdx = prevIdx;
+  }
+
+  if (!s.hasIndex(startIdx)) {
+    ""
+  } else {
+    s.slice(startIdx, endIdx)
+  }
+}
+
+// Split string by first space, returning [first_word, rest]
+let splitFirstWord(s: String): List<String> {
+  let trimmed = stringTrim(s);
+  var idx = String.begin;
+
+  // Find first space
+  while (trimmed.hasIndex(idx)) {
+    if (trimmed[idx] == Chars.SPACE) {
+      let first = trimmed.slice(String.begin, idx);
+      let rest = stringTrim(trimmed.slice(trimmed.next(idx), trimmed.end));
+      return [first, rest];
+    }
+    idx = trimmed.next(idx);
+  }
+
+  // No space found
+  [trimmed]
+}
 ```
 
 ## Parser State
@@ -117,8 +245,9 @@ export let parseTokens(tokenList: List<Token>): Document throws Bubble {
   let p = new Parser(tokenList);
   let children = parseChildren(p, null);
 
-  if (p.errors.length > 0) {
-    throw new Bubble(p.errors.build().join("\n"));
+  if (!p.errors.isEmpty) {
+    // Errors collected in parser - bubble to signal failure
+    bubble()
   }
 
   new Document(children, null)
@@ -130,7 +259,7 @@ export let parseTokens(tokenList: List<Token>): Document throws Bubble {
 Parse a sequence of child nodes until we hit a closing tag or EOF.
 
 ```temper
-let parseChildren(p: Parser, closingTag: String?): List<Node> {
+let parseChildren(p: Parser, closingTag: String?): List<Node> throws Bubble {
   let children = new ListBuilder<Node>();
 
   while (!p.isDone()) {
@@ -160,7 +289,7 @@ let parseChildren(p: Parser, closingTag: String?): List<Node> {
     }
   }
 
-  children.build()
+  children.toList()
 }
 
 let isClosingTag(p: Parser, tagName: String): Boolean {
@@ -181,9 +310,9 @@ let isClosingTag(p: Parser, tagName: String): Boolean {
 Dispatch to the appropriate parser based on token type.
 
 ```temper
-let parseNode(p: Parser): Node? {
+let parseNode(p: Parser): Node? throws Bubble {
   let t = p.peek();
-  let kind = t.tokenType.kind;
+  let kind = t.kind;
 
   if (kind == "text") {
     parseText(p)
@@ -226,7 +355,7 @@ let parseText(p: Parser): Node {
 Parse an HTML element with attributes and children.
 
 ```temper
-let parseElement(p: Parser): Node {
+let parseElement(p: Parser): Node throws Bubble {
   let startTok = p.advance(); // Consume TagOpen
   let tagName = startTok.value;
 
@@ -269,12 +398,12 @@ let parseElement(p: Parser): Node {
 Parse local (.name) or remote (Module.name) components.
 
 ```temper
-let parseComponent(p: Parser): Node {
+let parseComponent(p: Parser): Node throws Bubble {
   let startTok = p.advance(); // Consume ComponentOpen
   let name = startTok.value;
 
-  // Determine component type
-  let compType = if (name.startsWith(".")) {
+  // Determine component type - local components start with "."
+  let compType = if (stringStartsWith(name, ".")) {
     ComponentType.Local
   } else {
     ComponentType.Remote
@@ -314,7 +443,7 @@ class ComponentBodyResult(
   public slots: List<Slot>,
 ) {}
 
-let parseComponentBody(p: Parser, componentName: String): ComponentBodyResult {
+let parseComponentBody(p: Parser, componentName: String): ComponentBodyResult throws Bubble {
   let children = new ListBuilder<Node>();
   let slots = new ListBuilder<Slot>();
 
@@ -336,7 +465,7 @@ let parseComponentBody(p: Parser, componentName: String): ComponentBodyResult {
     }
   }
 
-  new ComponentBodyResult(children.build(), slots.build())
+  new ComponentBodyResult(children.toList(), slots.toList())
 }
 ```
 
@@ -345,7 +474,7 @@ let parseComponentBody(p: Parser, componentName: String): ComponentBodyResult {
 Parse named slots (<:name>...</:name>).
 
 ```temper
-let parseSlot(p: Parser): Node {
+let parseSlot(p: Parser): Node throws Bubble {
   let startTok = p.advance(); // Consume SlotOpen
   let name = startTok.value;
 
@@ -353,7 +482,7 @@ let parseSlot(p: Parser): Node {
   let attrs = parseAttributes(p);
 
   // Extract :let binding if present
-  let letBinding: String? = null;
+  var letBinding: String? = null;
   for (let attr of attrs) {
     when (attr) {
       is SpecialAttribute -> do {
@@ -396,7 +525,7 @@ let parseSlot(p: Parser): Node {
 Parse element/component attributes.
 
 ```temper
-let parseAttributes(p: Parser): List<Attribute> {
+let parseAttributes(p: Parser): List<Attribute> throws Bubble {
   let attrs = new ListBuilder<Attribute>();
 
   while (!p.isDone()) {
@@ -418,7 +547,7 @@ let parseAttributes(p: Parser): List<Attribute> {
       let name = nameTok.value;
 
       // Check for special attribute (:if, :for, :key, :let)
-      let isSpecial = name.startsWith(":");
+      let isSpecial = stringStartsWith(name, ":");
 
       // Check for =
       if (p.check(TokenType.AttrEquals)) {
@@ -428,7 +557,9 @@ let parseAttributes(p: Parser): List<Attribute> {
         if (p.check(TokenType.ExprOpen)) {
           let expr = parseExpression(p) as Expression;
           if (isSpecial) {
-            attrs.add(new SpecialAttribute(name.substring(1), expr, nameTok.span));
+            // Remove leading ":" from name
+            let kindName = stringSliceFromOffset(name, 1);
+            attrs.add(new SpecialAttribute(kindName, expr, nameTok.span));
           } else {
             attrs.add(new DynamicAttribute(name, expr, nameTok.span));
           }
@@ -448,7 +579,18 @@ let parseAttributes(p: Parser): List<Attribute> {
     }
   }
 
-  attrs.build()
+  attrs.toList()
+}
+
+// Get substring starting at character offset n
+let stringSliceFromOffset(s: String, n: Int): String {
+  var idx = String.begin;
+  for (var i = 0; i < n; i += 1) {
+    if (s.hasIndex(idx)) {
+      idx = s.next(idx);
+    }
+  }
+  s.slice(idx, s.end)
 }
 ```
 
@@ -460,7 +602,7 @@ Parse {expression} interpolation.
 let parseExpression(p: Parser): Node {
   let startTok = p.advance(); // Consume ExprOpen
 
-  let code = "";
+  var code = "";
   if (p.check(TokenType.ExprContent)) {
     code = p.advance().value;
   }
@@ -476,10 +618,10 @@ let parseExpression(p: Parser): Node {
 Parse <% %> and <%= %> expressions.
 
 ```temper
-let parseEEx(p: Parser, eexType: EExType): Node {
+let parseEEx(p: Parser, eexType: EExType): Node throws Bubble {
   let startTok = p.advance(); // Consume EExOpen/EExOutput/EExComment
 
-  let code = "";
+  var code = "";
   if (p.check(TokenType.EExContent)) {
     code = p.advance().value;
   }
@@ -495,23 +637,23 @@ let parseEEx(p: Parser, eexType: EExType): Node {
 }
 
 let isBlockStart(code: String): Boolean {
-  let trimmed = code.trim();
-  trimmed.startsWith("if ") ||
-  trimmed.startsWith("case ") ||
-  trimmed.startsWith("cond ") ||
-  trimmed.startsWith("for ") ||
-  trimmed.startsWith("unless ")
+  let trimmed = stringTrim(code);
+  stringStartsWith(trimmed, "if ") ||
+  stringStartsWith(trimmed, "case ") ||
+  stringStartsWith(trimmed, "cond ") ||
+  stringStartsWith(trimmed, "for ") ||
+  stringStartsWith(trimmed, "unless ")
 }
 
-let parseEExBlock(p: Parser, startCode: String, span: Span?): Node {
+let parseEExBlock(p: Parser, startCode: String, span: Span?): Node throws Bubble {
   // Extract block type and expression
-  let parts = startCode.trim().split(" ", 2);
+  let parts = splitFirstWord(stringTrim(startCode));
   let blockType = parts[0];
   var expression = if (parts.length > 1) { parts[1] } else { "" };
 
   // Remove trailing "do" if present
-  if (expression.endsWith(" do")) {
-    expression = expression.substring(0, expression.length - 3);
+  if (stringEndsWith(expression, " do")) {
+    expression = stringDropLast(expression, 3);
   }
 
   let clauses = new ListBuilder<EExClause>();
@@ -529,7 +671,7 @@ let parseEExBlock(p: Parser, startCode: String, span: Span?): Node {
         p.advance(); // Consume EEx open
         var clauseCode = "";
         if (p.check(TokenType.EExContent)) {
-          clauseCode = p.advance().value.trim();
+          clauseCode = stringTrim(p.advance().value);
         }
         p.expect(TokenType.EExClose);
 
@@ -552,7 +694,7 @@ let parseEExBlock(p: Parser, startCode: String, span: Span?): Node {
     }
   }
 
-  new EExBlock(blockType, expression, clauses.build(), span)
+  new EExBlock(blockType, expression, clauses.toList(), span)
 }
 
 let isBlockClause(p: Parser): Boolean {
@@ -560,14 +702,14 @@ let isBlockClause(p: Parser): Boolean {
   if (p.pos + 1 < p.tokens.length) {
     let nextTok = p.tokens[p.pos + 1];
     if (nextTok.tokenType.kind == "eex_content") {
-      let code = nextTok.value.trim();
-      return code == "end" || code == "else" || code.contains("->");
+      let code = stringTrim(nextTok.value);
+      return code == "end" || code == "else" || stringContains(code, "->");
     }
   }
   false
 }
 
-let parseEExBlockBody(p: Parser, blockType: String): List<Node> {
+let parseEExBlockBody(p: Parser, blockType: String): List<Node> throws Bubble {
   let children = new ListBuilder<Node>();
 
   while (!p.isDone()) {
@@ -584,7 +726,7 @@ let parseEExBlockBody(p: Parser, blockType: String): List<Node> {
     }
   }
 
-  children.build()
+  children.toList()
 }
 ```
 
@@ -594,7 +736,7 @@ let parseEExBlockBody(p: Parser, blockType: String): List<Node> {
 let parseComment(p: Parser): Node {
   let startTok = p.advance(); // Consume CommentOpen
 
-  let content = "";
+  var content = "";
   if (p.check(TokenType.CommentContent)) {
     content = p.advance().value;
   }

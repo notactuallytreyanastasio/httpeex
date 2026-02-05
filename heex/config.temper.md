@@ -23,31 +23,26 @@ export let pyName = "heex-py";
 export let rustName = "heex-rs";
 ```
 
-## Module Imports
+## Imports
 
-The library is organized into focused modules that build on each other:
+Import both the main module and tests (tests are in a separate submodule).
 
 ```temper
-// Core AST definitions - the data structures representing parsed templates
-import("./ast");
-
-// Tokenizer - lexical analysis, converts text to tokens
-import("./tokenizer");
-
-// Parser - syntax analysis, converts tokens to AST
-import("./parser");
-
-// Renderer - converts AST back to various outputs
-import("./renderer");
-
-// Public API surface
-import("./exports");
-
-// Test modules
-import("./tests/tokenizer");
-import("./tests/parser");
-import("./tests/integration");
+import(".");
+import("./tests");
 ```
+
+## Module Structure
+
+The library is organized into focused files that are all part of the "heex" module:
+
+- **ast.temper.md** - Core AST definitions (data structures representing parsed templates)
+- **tokenizer.temper.md** - Lexical analysis (converts text to tokens)
+- **parser.temper.md** - Syntax analysis (converts tokens to AST)
+- **renderer.temper.md** - Output generation (converts AST back to various outputs)
+- **exports.temper.md** - Public API surface
+
+All files in this directory are automatically combined into a single Temper module.
 
 ## Design Philosophy
 
