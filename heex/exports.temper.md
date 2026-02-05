@@ -136,15 +136,11 @@ all parse errors with line and column information.
 
 Example usage:
 
-```temper
-// In consuming code:
-do {
-  let doc = parseTemplate("<div>{@name}</div>");
-  let html = renderToHtml(doc);
-  console.log(html);
-} orelse {
-  console.log("Parse error occurred");
-}
+```
+// In consuming code (pseudocode):
+// let doc = parseTemplate("<div>{@name}</div>") orelse bubble();
+// let html = renderToHtml(doc);
+// console.log(html);
 ```
 
 ## Version Information

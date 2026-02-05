@@ -13,7 +13,7 @@ let assertTokenTypes(input: String, expected: List<String>): Void throws Bubble 
   if (actual.length != expected.length) {
     throw new Bubble("Expected ${expected.length} tokens, got ${actual.length}: ${actual}");
   }
-  for (let i = 0; i < expected.length; ++i) {
+  for (var i = 0; i < expected.length; ++i) {
     if (actual[i] != expected[i]) {
       throw new Bubble("Token ${i}: expected ${expected[i]}, got ${actual[i]}");
     }
@@ -23,7 +23,7 @@ let assertTokenTypes(input: String, expected: List<String>): Void throws Bubble 
 let assertTokenValues(input: String, expected: List<String>): Void throws Bubble {
   let tokens = tokenize(input);
   let actual = tokens.map { t => t.value };
-  for (let i = 0; i < expected.length && i < actual.length; ++i) {
+  for (var i = 0; i < expected.length && i < actual.length; ++i) {
     if (actual[i] != expected[i]) {
       throw new Bubble("Token ${i}: expected value '${expected[i]}', got '${actual[i]}'");
     }
@@ -223,7 +223,7 @@ test("tokenizes component with slots") {
 ## Error Cases
 
 ```temper
-let shouldBubble(action: fn(): Void throws Bubble): Boolean {
+let tokenizerShouldBubble(action: fn(): Void throws Bubble): Boolean {
   do {
     action();
     false
@@ -231,14 +231,14 @@ let shouldBubble(action: fn(): Void throws Bubble): Boolean {
 }
 
 test("errors on unterminated tag") {
-  assert(shouldBubble { tokenize("<div"); });
+  assert(tokenizerShouldBubble { tokenize("<div"); });
 }
 
 test("errors on unterminated expression") {
-  assert(shouldBubble { tokenize("{@name"); });
+  assert(tokenizerShouldBubble { tokenize("{@name"); });
 }
 
 test("errors on unterminated string in attribute") {
-  assert(shouldBubble { tokenize("<div class=\"foo>"); });
+  assert(tokenizerShouldBubble { tokenize("<div class=\"foo>"); });
 }
 ```

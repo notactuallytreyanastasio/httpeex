@@ -261,7 +261,7 @@ let renderComment(comment: Comment, out: StringBuilder): Void {
 ```temper
 let escapeHtml(s: String): String {
   let out = new StringBuilder();
-  for (let i = 0; i < s.length; ++i) {
+  for (var i = 0; i < s.length; ++i) {
     let c = s.charAt(i);
     when (c) {
       is "&" -> out.append("&amp;");
@@ -275,7 +275,7 @@ let escapeHtml(s: String): String {
 
 let escapeAttr(s: String): String {
   let out = new StringBuilder();
-  for (let i = 0; i < s.length; ++i) {
+  for (var i = 0; i < s.length; ++i) {
     let c = s.charAt(i);
     when (c) {
       is "&" -> out.append("&amp;");
@@ -425,7 +425,7 @@ Serialize the AST to JSON for tooling.
 export let renderJson(doc: Document): String {
   let out = new StringBuilder();
   out.append("{\"type\":\"document\",\"children\":[");
-  let first = true;
+  var first = true;
   for (let child of doc.children) {
     if (!first) {
       out.append(",");
@@ -448,7 +448,7 @@ let renderJsonNode(node: Node, out: StringBuilder): Void {
       out.append("{\"type\":\"element\",\"tag\":");
       jsonString(node.tag, out);
       out.append(",\"attributes\":[");
-      let first = true;
+      var first = true;
       for (let attr of node.attributes) {
         if (!first) { out.append(","); }
         first = false;
@@ -469,7 +469,7 @@ let renderJsonNode(node: Node, out: StringBuilder): Void {
       out.append(",\"componentType\":\"");
       out.append(node.componentType.kind);
       out.append("\",\"attributes\":[");
-      let first = true;
+      var first = true;
       for (let attr of node.attributes) {
         if (!first) { out.append(","); }
         first = false;
@@ -495,7 +495,7 @@ let renderJsonNode(node: Node, out: StringBuilder): Void {
       out.append("{\"type\":\"slot\",\"name\":");
       jsonString(node.name, out);
       out.append(",\"children\":[");
-      let first = true;
+      var first = true;
       for (let child of node.children) {
         if (!first) { out.append(","); }
         first = false;
@@ -558,7 +558,7 @@ let renderJsonAttr(attr: Attribute, out: StringBuilder): Void {
 
 let jsonString(s: String, out: StringBuilder): Void {
   out.append("\"");
-  for (let i = 0; i < s.length; ++i) {
+  for (var i = 0; i < s.length; ++i) {
     let c = s.charAt(i);
     when (c) {
       is "\"" -> out.append("\\\"");

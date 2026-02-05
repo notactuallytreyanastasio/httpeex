@@ -499,7 +499,7 @@ let parseEExBlock(p: Parser, startCode: String, span: Span?): Node {
   // Extract block type and expression
   let parts = startCode.trim().split(" ", 2);
   let blockType = parts[0];
-  let expression = if (parts.length > 1) { parts[1] } else { "" };
+  var expression = if (parts.length > 1) { parts[1] } else { "" };
 
   // Remove trailing "do" if present
   if (expression.endsWith(" do")) {
@@ -519,7 +519,7 @@ let parseEExBlock(p: Parser, startCode: String, span: Span?): Node {
       // Peek at content
       if (isBlockClause(p)) {
         p.advance(); // Consume EEx open
-        let clauseCode = "";
+        var clauseCode = "";
         if (p.check(TokenType.EExContent)) {
           clauseCode = p.advance().value.trim();
         }

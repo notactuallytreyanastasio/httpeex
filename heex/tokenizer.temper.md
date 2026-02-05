@@ -8,7 +8,7 @@ This is the first stage of the parsing pipeline.
 HEEx has several distinct token types representing different syntactic elements.
 
 ```temper
-let { Location, Span } = import("./ast");
+let { Location, Span, isRemoteComponent } = import("./ast");
 
 // All possible token types in HEEx
 export class TokenType {
@@ -156,7 +156,7 @@ export class Tokenizer(
   // Consume n characters and return them
   public advanceBy(n: Int): String {
     let start = pos;
-    for (let i = 0; i < n; ++i) {
+    for (var i = 0; i < n; ++i) {
       advance();
     }
     chars.substring(start, pos)
@@ -565,7 +565,7 @@ let tokenizeExpression(t: Tokenizer): Void {
 
   // Read until matching }
   let content = new StringBuilder();
-  let depth = 1;
+  var depth = 1;
 
   while (!t.isDone() && depth > 0) {
     let c = t.peek();
@@ -618,7 +618,7 @@ let tokenizeEEx(t: Tokenizer): Void {
   t.advanceBy(2); // Skip <%
 
   // Determine EEx type
-  let eexType = TokenType.EExOpen;
+  var eexType = TokenType.EExOpen;
   if (t.peek() == "=") {
     t.advance();
     eexType = TokenType.EExOutput;
@@ -682,7 +682,7 @@ let readName(t: Tokenizer): String {
   let name = new StringBuilder();
 
   // First character must be valid name start
-  let c = t.peek();
+  var c = t.peek();
   if (c != null && isNameStart(c)) {
     name.append(t.advance());
 
@@ -712,8 +712,5 @@ let skipWhitespace(t: Tokenizer): Void {
 }
 
 // Re-export helper from ast
-let isRemoteComponent(name: String): Boolean {
-  let first = name.charAt(0);
-  first >= "A" && first <= "Z"
-}
+// Use isRemoteComponent from ast module instead of duplicating here
 ```
