@@ -25,11 +25,13 @@ export let rustName = "heex-rs";
 
 ## Imports
 
-Import both the main module and tests (tests are in a separate submodule).
+Import the main module. Tests are in a separate submodule but disabled for now
+until Temper .temper.md submodule support is verified.
 
 ```temper
 import(".");
-import("./tests");
+// TODO: Re-enable once tests submodule works
+// import("./tests");
 ```
 
 ## Module Structure
